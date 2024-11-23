@@ -1,0 +1,72 @@
+# Carregando as bibliotecas necessárias
+library(survey)
+library(dplyr)
+library(ggplot2)
+install.packages("PNADcIBGE")
+library(PNADcIBGE)
+install.packages("dplyr")
+library(dplyr)
+install.packages("readr")
+library(readr)
+
+dadosPNADc <- get_pnadc(year=2024, quarter=2, design=T)
+
+# delimitando para a bahia
+dadosbahia <- subset(dadosPNADc, UF == "Bahia")
+X <- dadosbahia
+
+# Calculando a massa de rendimento ponderada para o total e para cada grupo
+total_rendimento_ponderado <- svytotal(~VD4020, design = X, na.rm = TRUE)
+
+
+# Filtrando os dados por categoria de cor/raça
+dados_negros_design <- subset(X, V2010 %in% c("Preta", "Parda"))
+dados_brancos_design <- subset(X, V2010 == "Branca")
+dados_outros_design <- subset(X, V2010 %in% c("Amarela", "Indígena", "Ignorado"))
+
+# Calculando a massa de rendimento ponderada para cada grupo
+total_negros_ponderado <- svytotal(~VD4020, design = dados_negros_design, na.rm = TRUE)
+total_brancos_ponderado <- svytotal(~VD4020, design = dados_brancos_design, na.rm = TRUE)
+total_outros_ponderado <- svytotal(~VD4020, design = dados_outros_design, na.rm = TRUE)
+
+# Usando coef() para acessar os valores do total de rendimento
+total_rendimento_value <- coef(total_rendimento_ponderado)
+total_negros_value <- coef(total_negros_ponderado)
+total_brancos_value <- coef(total_brancos_ponderado)
+total_outros_value <- coef(total_outros_ponderado)
+
+# Calculando a proporção de rendimento ponderada para cada grupo
+prop_negros_ponderado <- total_negros_value / total_rendimento_value
+prop_brancos_ponderado <- total_brancos_value / total_rendimento_value
+prop_outros_ponderado <- total_outros_value / total_rendimento_value
+
+# Criando um data frame com os resultados
+resultados_ponderados <- data.frame(
+  Categoria = c("Negros", "Brancos", "Outros"),
+  Massa_Rendimento_Ponderada = c(total_negros_value, total_brancos_value, total_outros_value),
+  Proporcao_Rendimento_Ponderada = c(prop_negros_ponderado, prop_brancos_ponderado, prop_outros_ponderado)
+)
+
+# Exibindo os resultados
+print(resultados_ponderados)
+
+# Gráfico para visualizar as proporções de rendimento ponderadas com a porcentagem na barra
+ggplot(resultados_ponderados, aes(x = Categoria, y = Proporcao_Rendimento_Ponderada, fill = Categoria)) +
+  geom_bar(stat = "identity", show.legend = FALSE, width = 0.7) +
+  geom_text(aes(label = scales::percent(Proporcao_Rendimento_Ponderada, accuracy = 0.1)),
+            vjust = -0.5, size = 5, color = "black") +  # Adicionando as porcentagens nas barras
+  labs(title = "Percentual acumulado do rendimento total por Cor/Raça (%) Brasil",
+       subtitle = "Elaboração: Jefferson A. MArques",
+       x = "Cor/Raça", 
+       y = "Proporção do Rendimento Total") +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14, family = "Helvetica"),
+    plot.title = element_text(face = "bold", size = 18),
+    plot.subtitle = element_text(size = 12, color = "gray"),
+    axis.title.x = element_text(size = 14, face = "bold"),
+    axis.title.y = element_text(size = 14, face = "bold"),
+    axis.text = element_text(size = 12),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  ) +
+  scale_fill_manual(values = c("#1f77b4", "#ff7f0e", "#2ca02c"))  # Cores modernas
